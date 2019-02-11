@@ -1,31 +1,43 @@
 package ru.rybalchenko.covergame;
 
-import javax.xml.crypto.Data;
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 public class FileScanner {
 
-    public static final int AVERAGE_LINE_LENGTH = 20;
+    private final Util util = new Util();
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
+        String dirName = "./";
+        if (args.length == 1) {
+            dirName = args[0];
+        }
+        String output = "./out.csv";
+
         FileScanner scanner = new FileScanner();
-        Long start = System.currentTimeMillis();
-        String result = scanner.findProducts();
-        Long time = System.currentTimeMillis() - start;
-        System.out.println(result);
-        System.out.println("Time: " + time);
+        long start = System.currentTimeMillis();
+        Set<Product> result = scanner.findProducts(dirName);
+        long time = System.currentTimeMillis() - start;
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(output), 128 * 1024)) {
+            for (Product product : result) {
+                writer.write(product.toCSV());
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+        System.out.println("Execution time: " + time);
     }
-
-    private final static char DELIMITER = ',';
-    private final static int BUFFER_SIZE = 32 * 1024; // typical L1 cache size per core
 
     private List<File> extractTestFiles(String dirName) {
         File dir = new File(dirName);
@@ -42,56 +54,37 @@ public class FileScanner {
         return result;
     }
 
-    public String findProducts() throws IOException {
-        String dirName = "./src/test/resources";
+    public Set<Product> findProducts(String dirName) {
         List<File> testFiles = extractTestFiles(dirName);
-        Result result = new Result(1000, 20);
+        List<CompletableFuture<ResultSet>> results = new ArrayList<>();
 
         for (File file : testFiles) {
-            Path filePath = FileSystems.getDefault().getPath(dirName, file.getName());
-            Stream<String> linesStream = Files.lines(filePath);
-            StringBuffer currentWord = new StringBuffer();
-            linesStream.forEach(line -> {
-                Product product = parseLine(line.toCharArray(), currentWord);
-                result.add(product);
-            });
-        }
-
-        return result.toString();
-    }
-
-    private void processProduct(Product product){
-
-
-    }
-
-    private Product parseLine(char[] rawLine, StringBuffer currentWord) {
-        recycleBuilder(currentWord);
-        int columnIndex = 0;
-        int id = -1;
-        String name = "";
-        String condition = "";
-        String state = "";
-        for (char symbol : rawLine) {
-            if (symbol == DELIMITER) {
-                switch (columnIndex) {
-                    case 0: id = Integer.valueOf(currentWord.toString());
-                    case 1: name = currentWord.toString();
-                    case 2: condition = currentWord.toString();
-                    case 3: state = currentWord.toString();
+            CompletableFuture<ResultSet> future = CompletableFuture.supplyAsync(() -> {
+                ResultSet result = new ResultSet(20, 1000);
+                Path filePath = FileSystems.getDefault().getPath(dirName, file.getName());
+                Stream<String> linesStream = null;
+                try {
+                    linesStream = Files.lines(filePath);
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                columnIndex++;
-                recycleBuilder(currentWord);
-            } else {
-                currentWord.append(symbol);
-            }
+                if (linesStream != null) {
+                    linesStream.forEach(line -> {
+                        Product product = util.parseLine(line.toCharArray());
+                        result.add(product);
+                    });
+                }
+                return result;
+            });
+            results.add(future);
         }
-        float price = Float.valueOf(currentWord.toString());
-        return new Product(id, name, condition, state, price);
+
+        Optional<ResultSet> finalResult = results.stream()
+                .map(CompletableFuture::join)
+                .reduce(ResultSet::merge);
+
+        return finalResult.get().getResult();
     }
 
-    private void recycleBuilder(StringBuffer currentWord) {
-        currentWord.setLength(0);
-        currentWord.ensureCapacity(AVERAGE_LINE_LENGTH);
-    }
+
 }

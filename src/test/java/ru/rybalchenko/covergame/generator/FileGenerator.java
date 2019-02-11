@@ -6,7 +6,10 @@ import ru.rybalchenko.covergame.State;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class FileGenerator {
@@ -16,10 +19,9 @@ public class FileGenerator {
 
     public static void main(String[] args) throws IOException {
         FileGenerator generator = new FileGenerator();
-        String fileName = "./src/test/resources/testFile.csv";
         List<String> ref = generator.generateRefProducts();
 
-        generator.writeFiles("./src/test/resources/", 100000, 5, ref);
+        generator.writeFiles("./src/test/resources/", 1000000, 5, ref);
     }
 
     public void writeReferenceFile(String filename, List<String> referenceProducts) throws IOException {
@@ -57,7 +59,7 @@ public class FileGenerator {
     }
 
 
-    private List<String> generateRefProducts() {
+    public List<String> generateRefProducts() {
         int index = 0;
         Map<Integer, ArrayList<String>> products = new HashMap<>();
         while (index < productRefSize) {
@@ -81,7 +83,6 @@ public class FileGenerator {
     }
 
     private String generateLine(int index, boolean ref) {
-        int id = index;
         String name = "product_" + index;
         Condition[] conditions = Condition.values();
         State[] states = State.values();
@@ -93,7 +94,7 @@ public class FileGenerator {
         } else {
             price = 0.5f + ThreadLocalRandom.current().nextFloat() * 0.5f;
         }
-        return id + DELIMITER + name + DELIMITER + condition + DELIMITER + state + DELIMITER + price + "\n";
+        return index + DELIMITER + name + DELIMITER + condition + DELIMITER + state + DELIMITER + price + "\n";
     }
 }
 

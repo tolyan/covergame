@@ -2,7 +2,7 @@ package ru.rybalchenko.covergame;
 
 import java.util.Objects;
 
-public class Product implements  Comparable {
+public class Product implements Comparable {
     private final int id;
     private final String name;
     private final String condition;
@@ -66,16 +66,17 @@ public class Product implements  Comparable {
                 '}';
     }
 
+    public String toCSV() {
+        return id + "," + name + "," + condition + "," + state + "," + price + '\n';
+    }
 
     @Override
     public int compareTo(Object o) {
-        if (o == null) return 0;
+        if (o == null) throw new NullPointerException();
         Product other = (Product) o;
-        float diff =  this.getPrice() - other.getPrice();
-        int result = 0;
-        if(diff < 0f) result = -1;
-        if(diff > 0f) result =  1;
-        if (diff == 0f) result =  0;
-        return result;
+        if (this.equals(other)) return 0;
+        int compare = Float.compare(this.price, other.price);
+        if (compare == 0) return 1;
+        return compare;
     }
 }
